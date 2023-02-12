@@ -1,9 +1,9 @@
 ﻿namespace XiaomiMiAPI.Model
 {
     /// <summary>
-    /// Mode of the transition.
+    /// Mode of the effect transtion.
     /// </summary>
-    public enum MiMode : int
+    public enum YeelightMode : int
     {
         /// <summary>
         ///  If effect is "sudden", then the color temperature will be changed directly to target value,

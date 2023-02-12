@@ -36,15 +36,13 @@ namespace XiaomiMiAPI
 
         private int _messageId = 1;
 
-        #region Public API
-
         /// <summary>
         /// Connect to the light.
         /// </summary>
         /// <param name="ipAddress">IP address of the light.</param>
         /// <param name="token">Token encoded in HEX string. Can be retrieved using <see cref="MiCloudClient"/>.</param>
         /// <exception cref="ArgumentNullException"></exception>
-        public async void Connect(string ipAddress, string token)
+        public async Task ConnectAsync(string ipAddress, string token)
         {
             if (string.IsNullOrEmpty(ipAddress))
                 throw new ArgumentNullException(nameof(ipAddress));
@@ -54,10 +52,8 @@ namespace XiaomiMiAPI
 
             _token = StringToByteArray(token);
             _remoteEndpoint = new IPEndPoint(IPAddress.Parse(ipAddress), YEELIGHT_PORT);
-            ConnectInternal();
+            await ConnectInternal();
         }
-
-        #region Power
 
         /// <summary>
         /// Toggle the light.
@@ -71,10 +67,10 @@ namespace XiaomiMiAPI
         /// <summary>
         /// Turn on/off the light.
         /// </summary>
-        /// <param name="mode"><see cref="MiMode"/>.</param>
+        /// <param name="mode"><see cref="YeelightMode"/>.</param>
         /// <param name="duration">Duration of the effect.</param>
         /// <returns>true if successful, false otherwise.</returns>
-        public async Task<bool> SetPowerAsync(bool turnOn, MiMode mode = MiMode.Smooth, int duration = 500)
+        public async Task<bool> SetPowerAsync(bool turnOn, YeelightMode mode = YeelightMode.Smooth, int duration = 500)
         {
             if (duration < 30)
                 throw new ArgumentOutOfRangeException("Minimal supported duration is 30 ms");
@@ -96,18 +92,14 @@ namespace XiaomiMiAPI
             return result == "on";
         }
 
-        #endregion // Power
-
-        #region Brightness
-
         /// <summary>
         /// Set brightness of the light.
         /// </summary>
         /// <param name="brightness">Brightness in percents. Supported range is 1 to 100.</param>
-        /// <param name="mode"><see cref="MiMode"/>.</param>
+        /// <param name="mode"><see cref="YeelightMode"/>.</param>
         /// <param name="duration">Duration of the effect.</param>
         /// <returns>true if successful, false otherwise.</returns>
-        public async Task<bool> SetBrightnessAsync(int brightness, MiMode mode = MiMode.Smooth, int duration = 500)
+        public async Task<bool> SetBrightnessAsync(int brightness, YeelightMode mode = YeelightMode.Smooth, int duration = 500)
         {
             if (brightness < 1 || brightness > 100)
                 throw new ArgumentOutOfRangeException("Brightness must be within the range of 1 and 100.");
@@ -121,9 +113,9 @@ namespace XiaomiMiAPI
         /// <summary>
         /// Adjust brightness of the light.
         /// </summary>
-        /// <param name="action"><see cref="MiAdjust"/>.</param>
+        /// <param name="action"><see cref="YeelightAdjust"/>.</param>
         /// <returns>true if successful, false otherwise.</returns>
-        public async Task<bool> AdjustBrightnessAsync(MiAdjust action = MiAdjust.Circle)
+        public async Task<bool> AdjustBrightnessAsync(YeelightAdjust action = YeelightAdjust.Circle)
         {
             return (await SendMessageAsync("set_adjust", GetAction(action), "bright"))[0] == "ok";
         }
@@ -159,18 +151,14 @@ namespace XiaomiMiAPI
             return int.Parse(result);
         }
 
-        #endregion // Brightness
-
-        #region Color temperature
-
         /// <summary>
         /// Set color temperature of the light.
         /// </summary>
         /// <param name="colorTemperature">Color temperature in Kelvins. Supported range is 1700 - 6500 (k).</param>
-        /// <param name="mode"><see cref="MiMode"/>.</param>
+        /// <param name="mode"><see cref="YeelightMode"/>.</param>
         /// <param name="duration">Duration of the effect.</param>
         /// <returns>true if successful, false otherwise.</returns>
-        public async Task<bool> SetColorTemperatureAsync(int colorTemperature, MiMode mode = MiMode.Smooth, int duration = 500)
+        public async Task<bool> SetColorTemperatureAsync(int colorTemperature, YeelightMode mode = YeelightMode.Smooth, int duration = 500)
         {
             if (colorTemperature < 1700 || colorTemperature > 6500)
                 throw new ArgumentOutOfRangeException("Color temperature must be within the range of 1700 and 6500.");
@@ -184,9 +172,9 @@ namespace XiaomiMiAPI
         /// <summary>
         /// Adjust color temperature of the light.
         /// </summary>
-        /// <param name="action"><see cref="MiAdjust"/>.</param>
+        /// <param name="action"><see cref="YeelightAdjust"/>.</param>
         /// <returns>true if successful, false otherwise.</returns>
-        public async Task<bool> AdjustColorTemperatureAsync(MiAdjust action = MiAdjust.Circle)
+        public async Task<bool> AdjustColorTemperatureAsync(YeelightAdjust action = YeelightAdjust.Circle)
         {
             return (await SendMessageAsync("set_adjust", GetAction(action), "ct"))[0] == "ok";
         }
@@ -221,10 +209,6 @@ namespace XiaomiMiAPI
 
             return int.Parse(result);
         }
-
-        #endregion // Color temperature
-
-        #region State
 
         /// <summary>
         /// Sets the current lamp setting as default and writes it into the persistent memory. 
@@ -339,18 +323,14 @@ namespace XiaomiMiAPI
             return state;
         }
 
-        #endregion // State
-
-        #endregion // Public API
-
-        private string GetMode(MiMode mode)
+        private string GetMode(YeelightMode mode)
         {
             switch (mode)
             {
-                case MiMode.Sudden:
+                case YeelightMode.Sudden:
                     return "sudden";
 
-                case MiMode.Smooth:
+                case YeelightMode.Smooth:
                     return "smooth";
 
                 default:
@@ -358,17 +338,17 @@ namespace XiaomiMiAPI
             }
         }
 
-        private string GetAction(MiAdjust action)
+        private string GetAction(YeelightAdjust action)
         {
             switch (action)
             {
-                case MiAdjust.Increase:
+                case YeelightAdjust.Increase:
                     return "increase";
 
-                case MiAdjust.Decrease:
+                case YeelightAdjust.Decrease:
                     return "decrease";
 
-                case MiAdjust.Circle:
+                case YeelightAdjust.Circle:
                     return "circle";
 
                 default:

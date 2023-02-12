@@ -1,7 +1,7 @@
 ﻿namespace XiaomiMiAPI.Model
 {
     /// <summary>
-    /// Represents the Yeelight state.
+    /// Yeelight device state.
     /// </summary>
     public struct YeelightState
     {

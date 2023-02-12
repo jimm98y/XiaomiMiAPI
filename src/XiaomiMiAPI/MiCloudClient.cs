@@ -51,8 +51,6 @@ namespace XiaomiMiAPI
             _client.DefaultRequestHeaders.Add("User-Agent", agent);
         }
 
-        #region Login
-
         private async Task<MiLoginInfo> LoginAsync(string username, string password)
         {
             const string serviceLoginUri = "https://account.xiaomi.com/pass/serviceLogin?sid=xiaomiio&_json=true";
@@ -200,10 +198,6 @@ namespace XiaomiMiAPI
             return string.Concat(c);
         }
 
-        #endregion // Login
-
-        #region API execution
-
         private async Task<string> ExecuteCallAsync(string url, string data, string ssecurity)
         {
             long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -333,47 +327,39 @@ namespace XiaomiMiAPI
             return Convert.ToBase64String(bytes);
         }
 
-        private static string GetApiUrl(string country)
+        private static string GetUri(string country)
         {
             string uriCountry = country.ToLowerInvariant() == "cn" ? "" : (country + ".");
             return $"https://{uriCountry}api.io.mi.com/app";
         }
 
-        #endregion // API execution
-
-        #region API methods
-
         private Task<string> GetHomesAsync(string country, string ssecurity)
         {
-            string url = $"{GetApiUrl(country)}/v2/homeroom/gethome";
+            string url = $"{GetUri(country)}/v2/homeroom/gethome";
             string data = $"{{\"fg\": true, \"fetch_share\": true, \"fetch_share_dev\": true, \"limit\": 300, \"app_ver\": 7}}";
             return ExecuteCallAsync(url, data, ssecurity);
         }
 
         private Task<string> GetDevicesAsync(string country, string homeId, string ownerId, string ssecurity)
         {
-            string url = $"{GetApiUrl(country)}/v2/home/home_device_list";
+            string url = $"{GetUri(country)}/v2/home/home_device_list";
             string data = $"{{\"home_owner\": {ownerId}, \"home_id\": {homeId}, \"limit\": 200, \"get_split_device\": true, \"support_smart_home\": true}}";
             return ExecuteCallAsync(url, data, ssecurity);
         }
 
         private Task<string> GetDeviceCountAsync(string country, string ssecurity)
         {
-            string url = $"{GetApiUrl(country)}/v2/user/get_device_cnt";
+            string url = $"{GetUri(country)}/v2/user/get_device_cnt";
             string data = $"{{\"fetch_own\": true, \"fetch_share\": true}}";
             return ExecuteCallAsync(url, data, ssecurity);
         }
 
         private Task<string> GetBeaconKeyAsync(string country, string deviceId, string ssecurity)
         {
-            string url = $"{GetApiUrl(country)}/v2/device/blt_get_beaconkey";
+            string url = $"{GetUri(country)}/v2/device/blt_get_beaconkey";
             string data = $"{{\"did\":\"{deviceId}\", \"pdid\":1}}";
             return ExecuteCallAsync(url, data, ssecurity);
         }
-
-        #endregion // API methods
-
-        #region Public API
 
         /// <summary>
         /// Retrieves all devices from the Mi cloud including the tokens.
@@ -485,8 +471,6 @@ namespace XiaomiMiAPI
 
             return result.ToArray();
         }
-
-        #endregion // Public API
 
         #region IDisposable
 
