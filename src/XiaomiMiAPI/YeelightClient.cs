@@ -12,7 +12,6 @@ using System.Net;
 using System.Net.Sockets;
 using XiaomiMiAPI.Model;
 using System.Text.Json.Nodes;
-using System.Collections;
 using System.Threading.Tasks;
 
 namespace XiaomiMiAPI
@@ -40,19 +39,100 @@ namespace XiaomiMiAPI
         /// Connect to the light.
         /// </summary>
         /// <param name="ipAddress">IP address of the light.</param>
-        /// <param name="token">Token encoded in HEX string. Can be retrieved using <see cref="MiCloudClient"/>.</param>
+        /// <param name="token">Token encoded in HEX string. Can be retrieved using <see cref="MiCloudClient"/>. 
+        /// When null, it is assumed the device is in the pairing hotspot mode and the token will be retrieved from the device.
+        /// This token gets regenerated after the device connects to the Wi-Fi network.</param>
         /// <exception cref="ArgumentNullException"></exception>
         public async Task ConnectAsync(string ipAddress, string token)
         {
             if (string.IsNullOrEmpty(ipAddress))
                 throw new ArgumentNullException(nameof(ipAddress));
 
-            if (string.IsNullOrEmpty(token))
-                throw new ArgumentNullException(nameof(token));
-
-            _token = StringToByteArray(token);
             _remoteEndpoint = new IPEndPoint(IPAddress.Parse(ipAddress), YEELIGHT_PORT);
-            await ConnectInternal();
+
+            _udpClient = new UdpClient(new IPEndPoint(IPAddress.Any, YEELIGHT_PORT));
+            await _udpClient.Client.ConnectAsync(_remoteEndpoint);
+
+            MiMessage helloMessage = CreateHelloMessage();
+
+            byte[] helloBytes = helloMessage.ToBytes();
+            await _udpClient.SendAsync(helloBytes, helloBytes.Length, _remoteEndpoint);
+
+            UdpReceiveResult receivedResult = await _udpClient.ReceiveAsync();
+            helloBytes = receivedResult.Buffer;
+
+            var helloResponse = MiMessage.FromBytes(helloBytes);
+            _deviceID = helloResponse.DeviceId;
+            _stamp = helloResponse.Stamp;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                _token = StringToByteArray(token);
+            }
+            else
+            {
+                // if we are in pairing mode, then the checksum from the hello message contains the token
+                _token = helloResponse.Checksum;
+            }
+
+            // derive AES IV and key
+            GetKeyAndIV(_token, out _key, out _iv);
+        }
+
+        /// <summary>
+        /// Configure the Wi-Fi. 
+        /// Warning: Originally, this was intended to bypass the need to connect to Xiaomi Mi cloud. Since it turned out the token gets regenerated after
+        ///  connecting to WiFi, this approach was not viable. This step can be replaced by using the Xiaomi Mi app to pair the device with the cloud account. 
+        ///  Then the <see cref="MiCloudClient"/> should be used to retrieve the token.
+        /// </summary>
+        /// <param name="timeZone">Time zone.</param>
+        /// <param name="uid">User ID - can be retrieved from the Mi cloud.</param>
+        /// <param name="bindKey">Bind key (I sniffed this one using Wireshark).</param>
+        /// <param name="wifiSsid">SSID of the Wi-Fi network you want the device to connect to.</param>
+        /// <param name="wifiLocation">Location of the Wi-Fi. E.g. "US".</param>
+        /// <param name="wifiPassword">Wi-Fi password.</param>
+        /// <param name="gmtOffset">GMT offset. E.g. 3600.</param>
+        /// <param name="countryDomain">Country domain. E.g. "us".</param>
+        /// <returns>true if successful, false otherwise.</returns>
+        [Obsolete("Use Xiaomi Mi app to connect the device to the Mi cloud.")]
+        public async Task<bool> ConfigureWiFi(
+            string timeZone, 
+            long uid, 
+            string bindKey,
+            string wifiSsid, 
+            string wifiLocation,
+            string wifiPassword, 
+            int gmtOffset, 
+            string countryDomain)
+        {
+            if (string.IsNullOrEmpty(timeZone))
+                timeZone = "Europe/Prague";
+
+            if (string.IsNullOrEmpty(wifiLocation))
+                wifiLocation = "US";
+
+            if (string.IsNullOrEmpty(countryDomain))
+                countryDomain = "us";
+            
+            dynamic parameters = new
+            {
+                tz = timeZone,
+                uid = uid,
+                bind_key = bindKey,
+                passwd = wifiPassword,
+                wifi_config = new { cc = wifiLocation },
+                ssid = wifiSsid,
+                gmt_offset = gmtOffset, // 3600
+                config_type = "app",
+                country_domain = countryDomain
+            };
+
+            var yeelightMessage = new YeelightMessage();
+            yeelightMessage.Id = _messageId++;
+            yeelightMessage.Method = "miIO.config_router";
+            yeelightMessage.Params = parameters;
+
+            return (await SendMessageAsync(yeelightMessage))[0] == "ok";
         }
 
         /// <summary>
@@ -356,27 +436,6 @@ namespace XiaomiMiAPI
             }
         }
 
-        private async Task ConnectInternal()
-        {
-            _udpClient = new UdpClient(new IPEndPoint(IPAddress.Any, YEELIGHT_PORT));
-            await _udpClient.Client.ConnectAsync(_remoteEndpoint);
-
-            MiMessage helloMessage = CreateHelloMessage();
-
-            byte[] helloBytes = helloMessage.ToBytes();
-            await _udpClient.SendAsync(helloBytes, helloBytes.Length, _remoteEndpoint);
-
-            UdpReceiveResult receivedResult = await _udpClient.ReceiveAsync();
-            helloBytes = receivedResult.Buffer;
-
-            var helloResponse = MiMessage.FromBytes(helloBytes);
-            _deviceID = helloResponse.DeviceId;
-            _stamp = helloResponse.Stamp;
-
-            // derive AES IV and key
-            GetKeyAndIV(_token, out _key, out _iv);
-        }
-
         private void VerifyConnected()
         {
             if (_udpClient == null)
@@ -433,7 +492,6 @@ namespace XiaomiMiAPI
 
         private static MiMessage CreateHelloMessage()
         {
-            // get token - TODO: convert to message
             MiMessage hello = new MiMessage();
             hello.MagicNumber = MiMessage.MAGIC;
             hello.Unknown1 = 0xffffffff;
@@ -441,9 +499,11 @@ namespace XiaomiMiAPI
             hello.Stamp = 0xffffffff;
             hello.PacketLength = 32;
 
-            // when in pairing mode (wifi hotspot) the checksum in the response will contain the Token to authenticate
+            // When in pairing mode (wifi hotspot) the checksum in the response will contain the Token to authenticate.
+            // However, this toke will be re-generated after the device exits the pairing mode and connects to the Wi-Fi.
+            // Then the only way to get the new regenerated token is to extract it from Xiaomi Mi cloud using the MiCloudClient.
             hello.Checksum = new byte[16] { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-            hello.Data = new byte[] { };
+            hello.Data = new byte[0];
             return hello;
         }
 

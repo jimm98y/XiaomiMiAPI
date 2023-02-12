@@ -377,6 +377,7 @@ namespace XiaomiMiAPI
             // first log in
             var login = await LoginAsync(username, password);
 
+            // if server location was specified, use it
             if (serverLocation != null && availableServerLocations.Contains(serverLocation.ToLowerInvariant()))
             {
                 serverLocations = new string[] { serverLocation };

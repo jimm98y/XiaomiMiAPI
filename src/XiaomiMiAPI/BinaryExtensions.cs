@@ -5,7 +5,12 @@ namespace XiaomiMiAPI
 {
     internal static class BinaryExtensions
     {
-        // Note this MODIFIES THE GIVEN ARRAY then returns a reference to the modified array.
+        /// <summary>
+        /// Reverse all bytes in the array.
+        /// Note this MODIFIES THE GIVEN ARRAY then returns a reference to the modified array.
+        /// </summary>
+        /// <param name="b"></param>
+        /// <returns></returns>
         public static byte[] Reverse(this byte[] b)
         {
             Array.Reverse(b);

@@ -62,11 +62,6 @@ namespace XiaomiMiAPI.API
             }
         }
 
-        public static int ToInt32BigEndian(byte[] buf, int i)
-        {
-            return (buf[i] << 24) | (buf[i + 1] << 16) | (buf[i + 2] << 8) | buf[i + 3];
-        }
-
         public byte[] ToBytes()
         {
             using (MemoryStream ms = new MemoryStream())
