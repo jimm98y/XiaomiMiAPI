@@ -33,7 +33,8 @@ var miCloudClient = new MiCloudClient();
 var homes = await miCloudClient.DiscoverDevicesAsync("+444123456789", "mySecretPassword");
 string token = homes.First().Devices.First().Token;
 ```
-
-The MiCloudClient is bascally just a C# port of the great work from Piotr Machowski: https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor
 ## Token
 Once you retrieve the token, you can store it somewhere safe and block the lamp from accessing the Internet. The `YeelightClient` communicates with the lamp locally and the token remains valid until you reset/disconnect/reconnect the lamp to the Wi-Fi.
+
+## Credits
+The `MiCloudClient` is just a C# port of the great work from Piotr Machowski: https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor
